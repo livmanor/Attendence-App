@@ -1,0 +1,13 @@
+import { useCallback, useEffect, useState } from 'react'
+import client from '../api/client'
+import { errorText } from '../lib'
+import { Empty, ErrorState, Loading } from '../components/States'
+
+const initial = { name: '', start_time: '', end_time: '', grace_minutes: '0' }
+export default function Shifts() {
+  const [rows, setRows] = useState([]), [form, setForm] = useState(initial), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const { data } = await client.get('/shifts'); setRows(Array.isArray(data) ? data : data.rows || []) } catch (err) { setError(errorText(err)) } finally { setLoading(false) } }, [])
+  useEffect(() => { load() }, [load])
+  async function submit(e) { e.preventDefault(); setBusy(true); setError(''); try { await client.post('/shifts', { ...form, grace_minutes: Number(form.grace_minutes) }); setForm(initial); await load() } catch (err) { setError(errorText(err)) } finally { setBusy(false) } }
+  return <main className="main"><div className="welcome"><div><span className="eyebrow">SCHEDULING</span><h1>Shifts</h1><p className="muted">Set expected hours and grace periods.</p></div></div><form className="form-panel shift-form" onSubmit={submit}><h2>Create a shift</h2><div className="form-grid"><label>Shift name<input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label><label>Start time<input type="time" required value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End time<input type="time" required value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label><label>Grace period (minutes)<input type="number" min="0" required value={form.grace_minutes} onChange={e => setForm({ ...form, grace_minutes: e.target.value })} /></label></div><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Add shift'}</button></form><section className="section"><div className="section-heading"><div><span className="eyebrow">SCHEDULES</span><h2>Defined shifts</h2></div></div>{loading ? <Loading /> : error ? <ErrorState message={error} retry={load} /> : rows.length ? <div className="shift-grid">{rows.map(row => <article className="shift-card" key={row.id}><span className="shift-icon">◷</span><div><h3>{row.name}</h3><p>{String(row.start_time).slice(0, 5)} – {String(row.end_time).slice(0, 5)}</p></div><span className="grace">{row.grace_minutes} min grace</span></article>)}</div> : <Empty title="No shifts yet" detail="Create a shift to define expected team hours." />}</section></main>
+}
